@@ -8,4 +8,5 @@ Interactive map to draw Roadworks & Utilities
 - Export to Excel
 
 - ## License
-© 2026 Dean P
+© 2026 Dean P. All rights reserved.
+Do not copy or reuse without permission.
