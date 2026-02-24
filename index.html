@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+  content="
+  default-src 'self';
+  script-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+  style-src 'self' https://unpkg.com https://cdnjs.cloudflare.com;
+  img-src 'self' data: https:;
+  font-src 'self' https://cdnjs.cloudflare.com;
+  connect-src 'self' https:;
+  object-src 'none';
+  frame-ancestors 'none';
+  base-uri 'self';
+  form-action 'self';
+  ">
+  <title>DPmaps – Roadworks & Utilities</title>
+
+  <!-- Leaflet core -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha384-…HASH…"
+    crossorigin="anonymous"
+  ></script>
+
+  <!-- Plugins -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
+  />
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet-side-by-side@2.1.1/leaflet-side-by-side.css"
+  />
+  <script src="https://unpkg.com/leaflet-side-by-side@2.1.1/leaflet-side-by-side.min.js"></script>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+  />
+
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+  />
+
+  <!-- Your styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Hamburger icon to toggle the pane -->
+<div id="toggle-pane-btn">
+  <div class="line"></div>
+  <div class="line"></div>
+  <div class="line"></div>
+</div>
+
+<!-- Layers pane -->
+<div id="layers-pane">
+  <!-- File controls: horizontal, icon-only -->
+  <div id="file-controls">
+    
+    <button id="load-btn" title="Load GeoJSON" aria-label="Load GeoJSON">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4h5l2 3h9a2 2 0 0 1 2 2v2"/>
+      <path d="M2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6H2z"/>
+      </svg>
+    </button>
+
+    <button id="save-btn" title="Save GeoJSON" aria-label="Save GeoJSON">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+    </button>
+    <button id="export-excel-btn" title="Export to Excel">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24">
+        <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/>
+        <path d="M6 6h12v12H6z"/>
+        <path d="M8 8l3 4-3 4M16 8l-3 4 3 4" stroke-width="1.5" fill="none"/>
+      </svg>
+    </button>
+
+    <button id="about-btn" title="About DPmaps" aria-label="About DPmaps">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+       <line x1="12" y1="8" x2="12" y2="8"/>
+       </svg>
+    </button>
+
+    <input type="file" id="load-file">
+  </div>
+
+<h3>Layers</h3>  
+<p>Select layer</p>
+<div id="controls">
+  <button id="roadworks-btn" data-layer="roadworks">
+    <i class="fa-solid fa-road"></i> Roadworks
+  </button>
+
+  <div id="roadworks-submenu">
+    <button id="rw-FY26-27">FY26/27</button>
+    <button id="rw-FY27-28">FY27/28</button>
+    <button id="rw-FY28-29">FY28/29</button>
+  </div>
+
+  <button id="water-btn" data-layer="water">
+    <i class="fa-solid fa-droplet"></i> Water
+  </button>
+  <button id="electricity-btn" data-layer="electricity">
+    <i class="fa-solid fa-bolt"></i> Electricity
+  </button>
+  <button id="gas-btn" data-layer="gas">
+    <i class="fa-solid fa-fire"></i> Gas
+  </button>
+
+  <button id="telecom-btn" data-layer="telecommunications">
+    <i class="fa-solid fa-signal"></i> Telecommunications
+  </button>
+  <div id="telecom-submenu">
+    <button id="tc-Telstra">Telstra</button>
+    <button id="tc-NBN">NBN</button>
+    <button id="tc-Optus">Optus</button>
+    <button id="tc-Other">Other</button>
+  </div>
+</div>
+
+  <!-- Job list (INSIDE sidebar) -->
+  <div id="job-list">
+    <h3>Jobs</h3>
+    <div id="job-buttons"></div>
+  </div>
+</div>
+
+<!-- Map container -->
+<div id="map"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<!-- Plugins -->
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+<script src="https://unpkg.com/leaflet-textpath/leaflet.textpath.js"></script>
+
+<!-- Polygon area -->
+<script src="https://unpkg.com/leaflet-geometryutil"></script>
+
+
+<!-- About Modal -->
+<div id="about-modal" class="about-modal hidden" role="dialog" aria-modal="true" aria-labelledby="about-title">
+  <div class="about-card">
+    
+    <!-- Close button -->
+    <button class="about-close" id="about-close" aria-label="Close">&times;</button>
+
+    <h2 id="about-title">About DPmaps</h2>
+    <p>Version: <span id="app-version">1.0.0</span> • Leaflet version: <span id="leaflet-version"></span></p>
+    <ul>
+      <li>Geospatial data is loaded and saved in WGS 84 coordinate system (EPSG:4326).</li>
+      <li>Hover over Cadastre to view property address.</li>
+    </ul>
+
+    <p class="tip">
+      Tip: Right-click a cadastre parcel to launch Google Street View.
+    </p>
+  
+    <h3>Limitations</h3>
+    <ul>
+      <li>Drawn features are not automatically saved and will be lost on page refresh.</li>
+      <li>Address search uses Leaflet/Nominatim and may not return house address.</li>
+    </ul>
+
+    <h3>Data Sources</h3>
+    <ul>
+      <li>© OpenStreetMap contributors (ODbL license)</li>
+      <li>NSW Spatial Services</li>
+      <li>Esri World Imagery</li>
+      <li>FCC</li>
+      <li>
+        ELVIS (Elevation and Depth – Foundation Spatial Data, Geoscience Australia) — 
+        © Commonwealth of Australia, licensed under Creative Commons Attribution 4.0 International.
+      </li>
+    </ul>
+
+    <hr>
+    <p><strong>Created by:</strong> Dean P • © 2026 DPmaps</p>
+
+  </div>
+</div>
+
+<!-- main JS -->
+<script src="js/map.js"></script>
+
+</body>
+</html>
+
+
