@@ -3,7 +3,8 @@
 Interactive map to draw Roadworks & Utilities
 
 ## Features
-- Toggle layers: roadworks, water, electricity, gas, telecom
+- Toggle layers: cadastre, contours and stormwater
+- Draw layers: roadworks & utilities
 - Search Job ID in Search Bar
 - Export to Excel
 
