@@ -1449,7 +1449,7 @@ function loadCadastre() {
 
   const canvasRenderer = L.canvas({ padding: 0.5 });
 
-  fetch('https://github.com/dpipa/DPmaps/releases/latest/download/Cadastre.geojson')
+  fetch('https://github.com/dpipa/DPmaps/releases/download/v1.0.0/Cadastre.geojson')
     .then(r => r.json())
     .then(parcelGeojson => {
 
@@ -1616,6 +1616,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('leaflet-version').textContent = L.version;
 
 });
+
 
 
 
