@@ -622,9 +622,10 @@ map.on('overlayadd', e => {
           },
           pointToLayer: (feature, latlng) =>
             L.circleMarker(latlng, {
-              radius: 5,
+              radius: 15,   //bigger touch target
               color: layerConfig.stormwater.color,
-              fillOpacity: 0.8
+              fillOpacity: 0.8,
+              interactive: true
             }),
           onEachFeature: (feature, layer) => {
             layer.bindPopup(
@@ -1465,8 +1466,11 @@ function loadCadastre() {
         onEachFeature: (feature, layer) => {
 
           layer.on({
-            mouseover: e =>
-              e.target.setStyle({ color: '#0078ff', weight: 1.5 }),
+            mouseover: e => {
+              const hoverColor = getComputedStyle(document.documentElement)
+                                   .getPropertyValue('--accent-hover').trim();
+              e.target.setStyle({ color: hoverColor, weight: 1.5 });
+            },
             mouseout: e =>
               parcels.resetStyle(e.target)
           });
