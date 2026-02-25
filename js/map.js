@@ -648,7 +648,7 @@ if (e.layer === demContoursLayer) {
 
 
   if (!demContoursLoaded2m) {
-    loadContours('data/2m_DEM_ContoursWGS84.geojson', demContoursLayer, () => {
+    loadContours('https://soft-credit-c195.d-pipatvong.workers.dev/contour_2m.geojson', demContoursLayer, () => {
       demContoursLoaded2m = true;
       console.log("2m DEM loaded");
     });
@@ -664,7 +664,7 @@ map.on('zoomend', function() {
 
   if (zoom >= 19 && !demContoursLoaded1m) {
 
-    loadContours('data/1m_DEM_ContoursWGS84.geojson', demContoursLayer, () => {
+    loadContours('https://soft-credit-c195.d-pipatvong.workers.dev/contour_1m.geojson', demContoursLayer, () => {
       demContoursLoaded1m = true;
       console.log("1m DEM loaded");
     });
@@ -1448,10 +1448,11 @@ function loadCadastre() {
   if (cadastreLoaded) return;
 
   const canvasRenderer = L.canvas({ padding: 0.5 });
-
-  fetch('https://github.com/dpipa/DPmaps/releases/download/v1.0.0/Cadastre.geojson')
+      
+  fetch('https://soft-credit-c195.d-pipatvong.workers.dev/Cadastre.geojson')
     .then(r => r.json())
     .then(parcelGeojson => {
+  
 
       // ---------- PARCELS ----------
       const parcels = L.geoJSON(parcelGeojson, {
@@ -1616,7 +1617,6 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('leaflet-version').textContent = L.version;
 
 });
-
 
 
 
