@@ -3,6 +3,14 @@
 // =====================
 const map = L.map('map').setView([-33.8705, 150.9570], 18);
 
+map.createPane('contourPane');
+map.createPane('cadastrePane');
+map.createPane('stormwaterPane');
+
+map.getPane('contourPane').style.zIndex = 400;
+map.getPane('cadastrePane').style.zIndex = 410;
+map.getPane('stormwaterPane').style.zIndex = 420;
+
 //escape function
 function escapeHTML(str) {
   if (typeof str !== 'string') return str;
@@ -18,6 +26,7 @@ function escapeHTML(str) {
     return chars[tag] || tag;
   });
 }
+
 // =====================
 // Map attribution
 // =====================
@@ -258,6 +267,7 @@ function loadContours(url, targetLayer, callback) {
     .then(geojson => {
 
       const contours = L.geoJSON(geojson, {
+        
         renderer: L.canvas({ padding: 0.5 }),
 
         style: function(feature) {
@@ -296,7 +306,8 @@ function loadContours(url, targetLayer, callback) {
             const clickBuffer = L.polyline(layer.getLatLngs(), {
               weight: 10,
               opacity: 0,
-              interactive: true
+              interactive: true,
+              pane: 'contourPane'
             }).addTo(targetLayer);
 
             clickBuffer.on('click', function(e) {
@@ -611,33 +622,45 @@ map.on('overlayadd', e => {
 
     if (stormwaterLoaded) return;
 
+    // Create shared canvas renderer
+    const canvasRenderer = L.canvas({ padding: 0.5 });
+
     fetch('data/stormwater.geojson')
       .then(res => res.json())
       .then(geojson => {
 
         stormwaterGeoJsonLayer = L.geoJSON(geojson, {
+          pane: 'stormwaterPane',
+          renderer: canvasRenderer,   
+
           style: {
             color: layerConfig.stormwater.color,
-            weight: 2
+            weight: 2,        
+            opacity: 0.8
           },
+
           pointToLayer: (feature, latlng) =>
             L.circleMarker(latlng, {
-              radius: 15,   //bigger touch target
+              renderer: canvasRenderer,   // important for points
+              radius: 15,                 // good mobile touch size
               color: layerConfig.stormwater.color,
               fillOpacity: 0.8,
               interactive: true
             }),
+
           onEachFeature: (feature, layer) => {
             layer.bindPopup(
               buildAttributeTable(feature.properties || {})
             );
           }
+
         });
 
         stormwaterLayer.addLayer(stormwaterGeoJsonLayer);
+        
         stormwaterLoaded = true;
 
-        console.log("Stormwater loaded");
+        console.log("Stormwater loaded (Canvas)");
       })
       .catch(console.error);
   }
@@ -1457,11 +1480,13 @@ function loadCadastre() {
 
       // ---------- PARCELS ----------
       const parcels = L.geoJSON(parcelGeojson, {
+        pane: 'cadastrePane',
         style: {
           color: 'oklch(70% 0.03 220)',
           weight: 0.8,
           fill: false
         },
+        
         renderer: canvasRenderer,
         onEachFeature: (feature, layer) => {
 
@@ -1534,7 +1559,6 @@ function loadCadastre() {
 
       map.addLayer(cadastreLayer);
 
-      cadastreLayer.setZIndex(1);
       cadastreLoaded = true;
 
 

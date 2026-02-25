@@ -83,7 +83,7 @@ html, body {
   position: absolute;
   width: 24px;
   height: 2px;
-  background-color: oklch(50% 0.02 40);
+  background-color: var(--text-secondary);
   border-radius: 1px;
   transform-origin: center;
   transition: all 0.5s ease;
