@@ -1187,15 +1187,50 @@ function attachPopupHandlers(layer) {
 
     saveBtn.onclick = () => {
       const p = layer.feature.properties;
-      p.jobId = popupEl.querySelector('#jobId').value.trim().slice(0,30);
+     
+      const oldJobId = p.jobId;
+      const newJobId = popupEl.querySelector('#jobId').value.trim().slice(0,30);
+      const utility = p.utility;
+
+      if (newJobId !== oldJobId) {
+
+        // Remove from old group
+        if (jobLayers[utility]?.[oldJobId]) {
+
+          jobLayers[utility][oldJobId].removeLayer(layer);
+
+          // If old group empty → delete + remove button
+          if (jobLayers[utility][oldJobId].getLayers().length === 0) {
+
+            delete jobLayers[utility][oldJobId];
+
+            const oldBtn = document.querySelector(
+              `[data-utility="${utility}"] .job-items button[data-job="${oldJobId}"]`
+            );
+
+            if (oldBtn) oldBtn.remove();
+          }
+        }
+
+        // Create new group if needed
+        if (!jobLayers[utility][newJobId]) {
+
+          jobLayers[utility][newJobId] = new L.FeatureGroup();
+          layerConfig[utility].group.addLayer(jobLayers[utility][newJobId]);
+
+          addSingleJobButton(utility, newJobId);
+        }
+
+        // Add to new group
+        jobLayers[utility][newJobId].addLayer(layer);
+
+        p.jobId = newJobId;
+      }
+
+      // Update other fields
       p.description = popupEl.querySelector('#description').value;
       p.startDate = popupEl.querySelector('#startDate').value;
       p.endDate = popupEl.querySelector('#endDate').value;
-
-      // Recalculate measurements
-      if (layer instanceof L.Polygon || layer instanceof L.Polyline) {
-        layer.feature.geometry = layer.toGeoJSON().geometry;
-      }
 
       layer.setPopupContent(renderView());
       layer.openPopup();
