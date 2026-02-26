@@ -622,46 +622,65 @@ map.on('overlayadd', e => {
 
     if (stormwaterLoaded) return;
 
+    
+    const isMobile = L.Browser.mobile;
     // Create shared canvas renderer
-    const canvasRenderer = L.canvas({ padding: 0.5 });
+    const canvasRenderer = L.canvas({
+      padding: isMobile ? 0 : 0.5
+    });
 
     fetch('data/stormwater.geojson')
       .then(res => res.json())
       .then(geojson => {
 
-        stormwaterGeoJsonLayer = L.geoJSON(geojson, {
-          pane: 'stormwaterPane',
-          renderer: canvasRenderer,   
+          
+          stormwaterGeoJsonLayer = L.geoJSON(null, {
+            pane: 'stormwaterPane',
+            renderer: canvasRenderer,
 
-          style: {
-            color: layerConfig.stormwater.color,
-            weight: 2,        
-            opacity: 0.8
-          },
-
-          pointToLayer: (feature, latlng) =>
-            L.circleMarker(latlng, {
-              renderer: canvasRenderer,   // important for points
-              radius: 15,                 // good mobile touch size
+            style: {
               color: layerConfig.stormwater.color,
-              fillOpacity: 0.8,
-              interactive: true
-            }),
+              weight: isMobile ? 1.2 : 2,
+              opacity: 0.8
+            },
 
-          onEachFeature: (feature, layer) => {
-            layer.bindPopup(
-              buildAttributeTable(feature.properties || {})
-            );
+            pointToLayer: (feature, latlng) =>
+              L.circleMarker(latlng, {
+                renderer: canvasRenderer,
+                radius: isMobile ? 8 : 15,
+                color: layerConfig.stormwater.color,
+                fillOpacity: 0.8,
+                interactive: true
+              }),
+
+            onEachFeature: (feature, layer) => {
+              layer.bindPopup(
+                buildAttributeTable(feature.properties || {})
+              );
+            }
+          });
+
+          const refreshStormwater = () => {
+            stormwaterGeoJsonLayer.clearLayers();
+
+            if (!isMobile || map.getZoom() >= 14) {
+              stormwaterGeoJsonLayer.addData(geojson);
+            }
+          };
+
+          stormwaterLayer.addLayer(stormwaterGeoJsonLayer);
+
+          refreshStormwater();
+
+          if (isMobile) {
+            map.on('zoomend', refreshStormwater);
           }
 
-        });
+          stormwaterLoaded = true;
 
-        stormwaterLayer.addLayer(stormwaterGeoJsonLayer);
-        
-        stormwaterLoaded = true;
+          console.log("Stormwater loaded (Canvas + Mobile Zoom Filter)");
+        })
 
-        console.log("Stormwater loaded (Canvas)");
-      })
       .catch(console.error);
   }
 
