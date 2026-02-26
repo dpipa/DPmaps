@@ -798,6 +798,23 @@ map.on('draw:deleted', function (e) {
       }
     }
 
+      // Remove job button from UI if job group deleted
+      if (!jobLayers[utility]?.[jobId]) {
+
+        const utilitySection = document.querySelector(
+          `[data-utility="${utility}"]`
+        );
+
+        if (utilitySection) {
+          const buttons = utilitySection.querySelectorAll('.job-items button');
+
+          buttons.forEach(btn => {
+            if (btn.textContent === jobId) {
+              btn.remove();
+            }
+          });
+        }
+      }
     // 5. Fully detach from map
     if (map.hasLayer(layer)) {
       map.removeLayer(layer);
