@@ -783,67 +783,54 @@ map.on('draw:deleted', function (e) {
   e.layers.eachLayer(layer => {
 
     const utility = layer.feature?.properties?.utility;
-    const jobId   = layer.feature?.properties?.jobId;
+    const jobId   = layer._currentJobId || layer.feature?.properties?.jobId;
 
-    // 1. Remove from drawnItems (safety)
-    drawnItems.removeLayer(layer);
+    if (!utility || !layerConfig[utility]) return;
+    const config = layerConfig[utility];
 
-    if (utility && layerConfig[utility]) {
+    // 1️⃣ Remove from drawnItems
+    if (drawnItems.hasLayer(layer)) drawnItems.removeLayer(layer);
 
-      // 2. Remove from main utility group
-      layerConfig[utility].group.removeLayer(layer);
+    // 2️⃣ Remove from main utility group
+    if (config.group.hasLayer(layer)) config.group.removeLayer(layer);
 
-      // 3. Remove from all sublayers
-      if (layerConfig[utility].sublayers) {
-        Object.values(layerConfig[utility].sublayers).forEach(sub => {
-          sub.removeLayer(layer);
-        });
-      }
+    // 3️⃣ Remove from all sublayers
+    if (config.sublayers) {
+      Object.values(config.sublayers).forEach(sub => {
+        if (sub.hasLayer(layer)) sub.removeLayer(layer);
+      });
     }
 
-    // 4. Remove from job group
-    if (
-      utility &&
-      jobId &&
-      jobLayers[utility] &&
-      jobLayers[utility][jobId]
-    ) {
-
+    // 4️⃣ Remove from job group
+    if (jobId && jobLayers[utility]?.[jobId]?.hasLayer(layer)) {
       jobLayers[utility][jobId].removeLayer(layer);
 
-      // If job group is now empty → delete it completely
+      // Delete empty job group
       if (jobLayers[utility][jobId].getLayers().length === 0) {
         delete jobLayers[utility][jobId];
       }
     }
 
-      // Remove job button from UI if job group deleted
-      if (!jobLayers[utility]?.[jobId]) {
-
-        const utilitySection = document.querySelector(
-          `[data-utility="${utility}"]`
-        );
-
-        if (utilitySection) {
-          const buttons = utilitySection.querySelectorAll('.job-items button');
-
-          buttons.forEach(btn => {
-            if (btn.textContent === jobId) {
-              btn.remove();
-            }
-          });
-        }
+    // 5️⃣ Remove job button from UI if job group deleted
+    if (!jobLayers[utility]?.[jobId]) {
+      const utilitySection = document.querySelector(`[data-utility="${utility}"]`);
+      if (utilitySection) {
+        const buttons = utilitySection.querySelectorAll('.job-items button');
+        buttons.forEach(btn => {
+          if (btn.textContent === jobId) btn.remove();
+        });
       }
-    // 5. Fully detach from map
-    if (map.hasLayer(layer)) {
-      map.removeLayer(layer);
     }
 
+    // 6️⃣ Track affected utility for UI update
+    affectedUtilities.add(utility);
+
+    // 7️⃣ Clean up reference
+    layer._currentJobId = null;
   });
 
   affectedUtilities.forEach(u => updateJobList(u));
 });
-
 
 // =====================
 // 6. Draw Handler
@@ -1410,29 +1397,25 @@ document.getElementById('export-excel-btn').addEventListener('click', () => {
 // =====================
 // 9. Load GeoJSON
 // =====================
+
 document.getElementById('load-btn').addEventListener('click', () => {
   document.getElementById('load-file').click();
 });
 
 document.getElementById('load-file').addEventListener('change', e => {
-
   const file = e.target.files[0];
   if (!file) return;
 
-  // Optional: basic file type check
   if (!file.name.toLowerCase().endsWith(".json") &&
       !file.name.toLowerCase().endsWith(".geojson")) {
     alert("Please upload a .json or .geojson file.");
     return;
   }
-  
+
   const reader = new FileReader();
 
   reader.onload = ev => {
-
-    // Validate JSON safely to prevent crash
     let geojson;
-
     try {
       geojson = JSON.parse(ev.target.result);
     } catch (err) {
@@ -1440,16 +1423,12 @@ document.getElementById('load-file').addEventListener('change', e => {
       return;
     }
 
-    // Validate GeoJSON structure
-    if (
-      !geojson ||
-      geojson.type !== "FeatureCollection" ||
-      !Array.isArray(geojson.features)
-    ) {
+    if (!geojson || geojson.type !== "FeatureCollection" || !Array.isArray(geojson.features)) {
       alert("File is not a valid GeoJSON FeatureCollection.");
       return;
     }
-
+    
+  
     geojson.features.forEach(feature => {
 
       const utility = feature.properties?.utility;
@@ -1457,83 +1436,68 @@ document.getElementById('load-file').addEventListener('change', e => {
       const sublayerName = feature.properties?.sublayer;
 
       if (!utility || !layerConfig[utility]) return;
-
       const config = layerConfig[utility];
 
-      // Create Leaflet layer from feature
-      const layer = L.geoJSON(feature).getLayers()[0];
-      if (!layer) return;
+      // Create GeoJSON normally
+      const geoLayer = L.geoJSON(feature);
 
-      layer.feature = feature;
+      geoLayer.eachLayer(layer => {
 
-      // -------------------------
-      // 1️⃣ Rebuild job group
-      // -------------------------
-      if (jobId) {
-        if (!jobLayers[utility][jobId]) {
-          jobLayers[utility][jobId] = new L.FeatureGroup();
-          config.group.addLayer(jobLayers[utility][jobId]);
+        layer._utility = utility;
+        layer._currentJobId = jobId || null;
+        layer._sublayer = sublayerName || null;
+
+        // 1️⃣ Add to drawnItems (enables edit/delete)
+        drawnItems.addLayer(layer);
+
+        // 2️⃣ Ensure job storage exists
+        if (!jobLayers[utility]) {
+          jobLayers[utility] = {};
         }
 
-        jobLayers[utility][jobId].addLayer(layer);
-      }
+        if (jobId) {
 
-      // -------------------------
-      // 2️⃣ Add to correct sublayer
-      // -------------------------
-      if (config.sublayers && sublayerName && config.sublayers[sublayerName]) {
-        config.sublayers[sublayerName].addLayer(layer);
-      } else {
-        config.group.addLayer(layer);
-      }
+          if (!jobLayers[utility][jobId]) {
+            jobLayers[utility][jobId] = new L.FeatureGroup();
+            layerConfig[utility].group.addLayer(jobLayers[utility][jobId]);
+          }
 
-      // -------------------------
-      // 3️⃣ Apply correct styling
-      // -------------------------
-      applyUtilityStyle(layer, utility, sublayerName);
+          jobLayers[utility][jobId].addLayer(layer);
+        }
 
-      // -------------------------
-      // 4️⃣ Add to drawnItems
-      // -------------------------
-      drawnItems.addLayer(layer);
+        // 5️⃣ Style
+        applyUtilityStyle(layer, utility, sublayerName);
 
-      // -------------------------
-      // 5️⃣ Reattach popup handlers
-      // -------------------------
-      attachPopupHandlers(layer);
+        // 6️⃣ Popup
+        attachPopupHandlers(layer);
+      });
 
     });
+
 
     updateJobList();
   };
 
   reader.readAsText(file);
-
 });
 
 
 function applyUtilityStyle(layer, utility, sublayerName) {
-
   if (!layer.setStyle) return;
 
   if (utility === 'roadworks' && sublayerName) {
     layer.setStyle({
       color: roadworksColors[sublayerName] || layerConfig[utility].color
     });
-  }
-
-  else if (utility === 'telecommunications' && sublayerName) {
+  } else if (utility === 'telecommunications' && sublayerName) {
     layer.setStyle({
       color: telecomColors[sublayerName] || layerConfig[utility].color
     });
-  }
-
-  else {
+  } else {
     layer.setStyle({
       color: layerConfig[utility].color
     });
   }
-
 }
 
 
