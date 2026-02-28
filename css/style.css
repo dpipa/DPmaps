@@ -1,9 +1,9 @@
 :root {
   /* Dark foundation */
-  --bg: oklch(11% 0.005 250);
-  --surface: oklch(17% 0.008 250);
-  --surface-elevated: oklch(23% 0.012 250);
-  --border: oklch(30% 0.015 250);
+  --bg: oklch(17% 0.005 250);
+  --surface: oklch(21% 0.008 250);
+  --surface-elevated: oklch(27% 0.012 250);
+  --border: oklch(38% 0.015 250);
 
   /* Text */
   --text-primary: oklch(92% 0 0);
@@ -432,8 +432,14 @@ html, body {
   fill: oklch(52% 0.14 152);
 }
 
-.leaflet-pane.boundaryPane {
-  z-index: 1300 !important;
+.leaflet-boundaryPane-pane {
+  z-index: 800 !important;
+}
+
+/* Make lines sharp in the boundaryPane */
+.leaflet-pane.leaflet-boundary-pane svg path {
+  shape-rendering: crispEdges;   /* prevents blurring on zoom */
+  vector-effect: non-scaling-stroke; /* keeps stroke width constant on zoom */
 }
 
 /* Stormwater popup table */

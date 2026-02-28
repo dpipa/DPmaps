@@ -1,19 +1,19 @@
 // =====================
 // 1. Create map
 // =====================
-const map = L.map('map').setView([-33.8705, 150.9570], 18);
+const map = L.map('map').setView([-33.8705, 150.8954], 11);
 
 // Create labels pane
-map.createPane('basePane'); map.getPane('basePane').style.zIndex = 0;
+map.createPane('basePane'); map.getPane('basePane').style.zIndex = 200;
 map.createPane('contourPane'); map.getPane('contourPane').style.zIndex = 450;
 map.createPane('stormwaterPane'); map.getPane('stormwaterPane').style.zIndex = 460;
 map.createPane('cadastrePane'); map.getPane('cadastrePane').style.zIndex = 470;
-map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 120;
+map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 650;
 map.getPane('labelsPane').style.pointerEvents = 'none';
 map.createPane('contourLabelPane'); map.getPane('contourLabelPane').style.zIndex = 500; 
 map.getPane('contourLabelPane').style.pointerEvents = 'none';
 map.createPane('drawPane'); map.getPane('drawPane').style.zIndex = 700;
-map.createPane('boundaryPane'); map.getPane('boundaryPane').style.zIndex = 1300;
+map.createPane('boundaryPane'); map.getPane('boundaryPane').style.zIndex = 800;
 map.getPane('boundaryPane').style.pointerEvents = 'none';
 
 let cadastreLayers = [];
@@ -204,7 +204,7 @@ geocoder.on('markgeocode', function(e) {
 // =====================
 // 2. Load Fairfield LGA boundary
 // =====================
-
+let boundary = null;
 fetch('data/fairfield_lga.geojson')
   .then(res => {
     if (!res.ok) throw new Error('GeoJSON not found');
@@ -213,16 +213,16 @@ fetch('data/fairfield_lga.geojson')
   .then(geojson => {
     console.log('Boundary loaded');
 
-    const boundary = L.geoJSON(geojson, {
-        pane: 'boundaryPane',
-        style: {
+    boundary = L.geoJSON(geojson, {
+      pane: 'boundaryPane',
+      smoothFactor: 0,
+      style: {
         color: 'red',
         weight: 3,
         fill: false
       }
     }).addTo(map);
-
-    map.fitBounds(boundary.getBounds());
+    
   })
   .catch(err => {
     console.error('Boundary load failed:', err);
@@ -257,6 +257,42 @@ let demContoursLoaded1m = false;
 
 let contourLabelData = []
 
+function getFlatLatLngs(layer) {
+  let latlngs = layer.getLatLngs();
+  latlngs = L.LineUtil.isFlat(latlngs) ? latlngs : latlngs.flat();
+  return latlngs || [];
+}
+
+function getLabelAnchorAndAngle(latlngs) {
+  if (!latlngs.length) return null;
+
+  if (latlngs.length === 1) {
+    return {
+      latlng: latlngs[0],
+      angleDeg: 0
+    };
+  }
+
+  const midIndex = Math.floor((latlngs.length - 1) / 2);
+  const p1 = latlngs[midIndex];
+  const p2 = latlngs[Math.min(midIndex + 1, latlngs.length - 1)];
+
+  const dx = p2.lng - p1.lng;
+  const dy = p2.lat - p1.lat;
+
+  let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
+
+  // Keep text upright
+  if (angleDeg > 90) angleDeg -= 180;
+  if (angleDeg < -90) angleDeg += 180;
+
+  return {
+    latlng: latlngs[midIndex],
+    angleDeg
+  };
+}
+
+
 // Function to load contour file
 function loadContours(url, targetLayer, callback) {
 
@@ -274,13 +310,13 @@ function loadContours(url, targetLayer, callback) {
           // Default 1m
           let color = 'oklch(70% 0.15 240)';
           let weight = 1.5;
-          let opacity = 0.9;
+          let opacity = 0.8;
 
           // Every 2m stronger
           if (level % 2 === 0) {
             color = 'oklch(60% 0.18 240)';
             weight = 2;
-            opacity = 0.95;
+            opacity = 0.9;
           }
 
           // Every 10m = index contour
@@ -332,15 +368,16 @@ function loadContours(url, targetLayer, callback) {
         const elevation = layer.feature.properties.Level;
         if (elevation == null) return;
 
-        let latlngs = layer.getLatLngs();
-        latlngs = L.LineUtil.isFlat(latlngs) ? latlngs : latlngs.flat();
+        const latlngs = getFlatLatLngs(layer);
         if (!latlngs.length) return;
 
-        const midPoint = latlngs[Math.floor(latlngs.length / 2)];
+        const labelInfo = getLabelAnchorAndAngle(latlngs);
+        if (!labelInfo) return;
 
         contourLabelData.push({
-          latlng: midPoint,
-          elevation: elevation
+          latlng: labelInfo.latlng,
+          elevation: elevation,
+          angleDeg: labelInfo.angleDeg
         });
       });
 
@@ -376,13 +413,17 @@ function drawContourLabelsCanvas() {
 
     const point = map.latLngToContainerPoint(label.latlng);
 
-    ctx.fillText(
-      label.elevation.toFixed(1) + " m",
-      point.x,
-      point.y
-    );
-   });
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    ctx.rotate((label.angleDeg || 0) * Math.PI / 180);
 
+    const text = label.elevation.toFixed(1) + " m";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.lineWidth = 3;
+    ctx.strokeText(text, 0, 0);
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+   });
     ctx.restore();
   }
 
