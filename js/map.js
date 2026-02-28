@@ -3,13 +3,22 @@
 // =====================
 const map = L.map('map').setView([-33.8705, 150.9570], 18);
 
-map.createPane('contourPane');
-map.createPane('cadastrePane');
-map.createPane('stormwaterPane');
+// Create labels pane
+map.createPane('basePane'); map.getPane('basePane').style.zIndex = 0;
+map.createPane('contourPane'); map.getPane('contourPane').style.zIndex = 450;
+map.createPane('stormwaterPane'); map.getPane('stormwaterPane').style.zIndex = 460;
+map.createPane('cadastrePane'); map.getPane('cadastrePane').style.zIndex = 470;
+map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 120;
+map.getPane('labelsPane').style.pointerEvents = 'none';
+map.createPane('contourLabelPane'); map.getPane('contourLabelPane').style.zIndex = 500; 
+map.getPane('contourLabelPane').style.pointerEvents = 'none';
+map.createPane('drawPane'); map.getPane('drawPane').style.zIndex = 700;
+map.createPane('boundaryPane'); map.getPane('boundaryPane').style.zIndex = 1300;
+map.getPane('boundaryPane').style.pointerEvents = 'none';
 
-map.getPane('contourPane').style.zIndex = 400;
-map.getPane('cadastrePane').style.zIndex = 410;
-map.getPane('stormwaterPane').style.zIndex = 420;
+let cadastreLayers = [];
+let stormwaterLayers = [];
+let contourLayers = [];
 
 //escape function
 function escapeHTML(str) {
@@ -30,11 +39,11 @@ function escapeHTML(str) {
 // =====================
 // Map attribution
 // =====================
-
 // OpenStreetMap
 const osm = L.tileLayer(
   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   {
+    pane: 'basePane',
     attribution:
       '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">' +
       'OpenStreetMap contributors</a>'
@@ -46,17 +55,18 @@ const esriSatellite = L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/' +
   'World_Imagery/MapServer/tile/{z}/{y}/{x}',
   {
+    pane: 'basePane',
     attribution:
       'Powered by <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> | ' +
       'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
   }
 );
 
-
 // NSW SixMaps imagery
 const nswImagery = L.tileLayer(
   'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
   {
+    pane: 'basePane',
     attribution:
       '© State of New South Wales (Spatial Services, a business unit of the Department of Customer Service NSW). ' +
       'For current information go to ' +
@@ -65,12 +75,6 @@ const nswImagery = L.tileLayer(
     maxZoom: 21
   }
 );
-
-
-// Create labels pane (must be AFTER map is created)
-map.createPane('labelsPane');
-map.getPane('labelsPane').style.zIndex = 650;
-map.getPane('labelsPane').style.pointerEvents = 'none';
 
 //====================
 // Tile Layers
@@ -173,11 +177,6 @@ geocoder.on('startgeocode', function(e) {
     const group = L.featureGroup(foundLayers);
     map.fitBounds(group.getBounds(), { padding: [50, 50] });
   }
-
-  // IMPORTANT:
-  // We DO NOT prevent default.
-  // This allows address search to still run.
-
 });
 
 geocoder.on('markgeocode', function(e) {
@@ -202,10 +201,10 @@ geocoder.on('markgeocode', function(e) {
   map.setView(center, 18);
 });
 
-
 // =====================
 // 2. Load Fairfield LGA boundary
 // =====================
+
 fetch('data/fairfield_lga.geojson')
   .then(res => {
     if (!res.ok) throw new Error('GeoJSON not found');
@@ -215,7 +214,8 @@ fetch('data/fairfield_lga.geojson')
     console.log('Boundary loaded');
 
     const boundary = L.geoJSON(geojson, {
-      style: {
+        pane: 'boundaryPane',
+        style: {
         color: 'red',
         weight: 3,
         fill: false
@@ -250,14 +250,12 @@ let easementsLoaded = false;
 // 3.1 DEM Contours Layer
 // =====================
 const demContoursLayer = new L.FeatureGroup();
+
 let demContoursLoaded = false;
-
-// =====================
-// DEM Contours Setup
-// =====================
-
 let demContoursLoaded2m = false;
 let demContoursLoaded1m = false;
+
+let contourLabelData = []
 
 // Function to load contour file
 function loadContours(url, targetLayer, callback) {
@@ -267,71 +265,177 @@ function loadContours(url, targetLayer, callback) {
     .then(geojson => {
 
       const contours = L.geoJSON(geojson, {
-        
+        pane: 'contourPane',
+        interactive: true,
         renderer: L.canvas({ padding: 0.5 }),
-
-        style: function(feature) {
-
+        style: feature => {
           const level = feature.properties.Level;
-
+          
           // Default 1m
           let color = 'oklch(70% 0.15 240)';
           let weight = 1.5;
-          let opacity = 0.6;
+          let opacity = 0.9;
 
           // Every 2m stronger
           if (level % 2 === 0) {
             color = 'oklch(60% 0.18 240)';
             weight = 2;
-            opacity = 0.8;
+            opacity = 0.95;
           }
 
           // Every 10m = index contour
           if (level % 10 === 0) {
             color = 'oklch(45% 0.15 240)';
             weight = 3;
-            opacity = 0.95;
+            opacity = 1;
           }
 
-          return { color, weight, opacity };
+          return { color, weight, opacity,
+            smoothFactor: 0
+           };
         },
 
         onEachFeature: function(feature, layer) {
 
-          if (feature.properties && feature.properties.Level != null) {
+          if (feature.properties && feature.properties.Level == null) return;
 
-            const level = feature.properties.Level;
+          const level = feature.properties.Level;
 
-            // Invisible click buffer (easy clicking)
-            const clickBuffer = L.polyline(layer.getLatLngs(), {
-              weight: 10,
-              opacity: 0,
-              interactive: true,
-              pane: 'contourPane'
-            }).addTo(targetLayer);
+          // Invisible click buffer (easy clicking)
+          const clickBuffer = L.polyline(layer.getLatLngs(), {
+            weight: 10,
+            opacity: 0,
+            interactive: true,
+            pane: 'contourPane'
+          }).addTo(demContoursLayer);
 
-            clickBuffer.on('click', function(e) {
-              L.popup({
-                closeButton: true,
-                autoClose: true,
-                className: 'contour-popup'
-              })
-              .setLatLng(e.latlng)
-              .setContent(`<strong>${level.toFixed(1)} m</strong>`)
-              .openOn(map);
-            });
-
-          }
+          clickBuffer.on('click', function(e) {
+            L.popup({
+              closeButton: true,
+              autoClose: true,
+              className: 'contour-popup'
+            })
+            .setLatLng(e.latlng)
+            .setContent(`<strong>${level.toFixed(1)} m</strong>`)
+            .openOn(map);
+          });
         }
       });
 
-      targetLayer.addLayer(contours);
+      demContoursLayer.addLayer(contours);
+      // Precompute label positions once (FAST)
+      contourLabelData = [];
+
+      contours.eachLayer(layer => {
+        if (!layer.feature) return;
+
+        const elevation = layer.feature.properties.Level;
+        if (elevation == null) return;
+
+        let latlngs = layer.getLatLngs();
+        latlngs = L.LineUtil.isFlat(latlngs) ? latlngs : latlngs.flat();
+        if (!latlngs.length) return;
+
+        const midPoint = latlngs[Math.floor(latlngs.length / 2)];
+
+        contourLabelData.push({
+          latlng: midPoint,
+          elevation: elevation
+        });
+      });
+
+      // draw once after load
+      drawContourLabelsCanvas();
 
       if (callback) callback();
-
     })
     .catch(console.error);
+
 }
+
+function drawContourLabelsCanvas() {
+
+  const renderer = demContoursLayer._renderer;
+  if (!renderer || !renderer._ctx) return;
+
+  const ctx = renderer._ctx;
+  const bounds = map.getBounds();
+  const interval = getLabelInterval();
+
+  ctx.save();
+
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "black";
+
+  contourLabelData.forEach(label => {
+
+    if (Math.round(label.elevation) % interval !== 0) return;
+    if (!bounds.contains(label.latlng)) return;
+
+    const point = map.latLngToContainerPoint(label.latlng);
+
+    ctx.fillText(
+      label.elevation.toFixed(1) + " m",
+      point.x,
+      point.y
+    );
+   });
+
+    ctx.restore();
+  }
+
+function getLabelInterval() {
+  const zoom = map.getZoom();
+  if (zoom >= 17) return 1;   // close → 1m
+  if (zoom >= 15) return 5;   // medium → 5m
+  return 10;                  // far → 10m
+}
+
+map.on("zoomend moveend", function () {
+  demContoursLayer.redraw();   // redraw lines
+  drawContourLabelsCanvas();   // redraw labels
+});
+
+//==========
+//map on click for cadastre, stormwater, contour
+//==========
+map.on('click', function (e) {
+
+  const latlng = e.latlng;
+
+  // 1️⃣ Check utilities FIRST (so edit works properly)
+  let clickedUtility = null;
+
+  drawnItems.eachLayer(layer => {
+    if (layer.getBounds && layer.getBounds().contains(latlng)) {
+      clickedUtility = layer;
+    }
+  });
+
+  if (clickedUtility) {
+    clickedUtility.openPopup();
+    return;
+  }
+
+  // 2️⃣ Stormwater
+  for (let layer of stormwaterLayers) {
+    if (layer.getBounds && layer.getBounds().contains(latlng)) {
+      layer.openPopup();
+      return;
+    }
+  }
+
+  // 3️⃣ Cadastre
+  for (let layer of cadastreLayers) {
+    if (layer.getBounds && layer.getBounds().contains(latlng)) {
+      layer.openPopup();
+      return;
+    }
+  }
+  
+});
 
 
 // GDA94 / MGA Zone 56 (NSW)
@@ -410,7 +514,6 @@ Object.values(layerConfig).forEach(config => {
   }
 });
 
-
 // ========
 // Utility Buttons (Merged & Clean)
 // ========
@@ -421,7 +524,7 @@ let activeTelecomSublayer = 'Telstra';
 // Ensure drawnItems always stays on top
 const drawnItems = new L.FeatureGroup();
 map.createPane('drawPane');
-map.getPane('drawPane').style.zIndex = 640;
+map.getPane('drawPane').style.zIndex = 1000;
 drawnItems.options.pane = 'drawPane';
 map.addLayer(drawnItems);
 
@@ -633,11 +736,12 @@ map.on('overlayadd', e => {
       .then(res => res.json())
       .then(geojson => {
 
+          stormwaterLayers = [];
           
           stormwaterGeoJsonLayer = L.geoJSON(null, {
             pane: 'stormwaterPane',
+            interactive: true,
             renderer: canvasRenderer,
-
             style: {
               color: layerConfig.stormwater.color,
               weight: isMobile ? 1.2 : 2,
@@ -676,11 +780,13 @@ map.on('overlayadd', e => {
             map.on('zoomend', refreshStormwater);
           }
 
+          stormwaterGeoJsonLayer.eachLayer(layer => {
+            stormwaterLayers.push(layer);
+          })
           stormwaterLoaded = true;
 
           console.log("Stormwater loaded (Canvas + Mobile Zoom Filter)");
         })
-
       .catch(console.error);
   }
 
@@ -749,7 +855,6 @@ document.getElementById('tc-Other')
 // =====================
 // 5. Draw control
 // =====================
-
 const drawControl = new L.Control.Draw({
   edit: {
     featureGroup: drawnItems,
@@ -774,6 +879,16 @@ map.on('draw:deletestart', function () {
   }
 });
 
+// Call toggleDrawLayer(true) to show, false to hide
+function toggleDrawLayer(show) {
+  if (show) {
+    // Add back to map if hidden
+    if (!map.hasLayer(drawnItems)) map.addLayer(drawnItems);
+  } else {
+    // Hide layer
+    if (map.hasLayer(drawnItems)) map.removeLayer(drawnItems);
+  }
+}
 // ---------------------
 // Optional: Listen to delete events
 map.on('draw:deleted', function (e) {
@@ -1092,8 +1207,13 @@ function renderUtility(utility) {
   items.style.display = 'none';
 
   Object.keys(jobLayers[utility] || {}).forEach(jobId => {
+    const row = document.createElement('div');
+    row.className = 'job-row';
+
     const btn = document.createElement('button');
     btn.textContent = jobId;
+    btn.dataset.job = jobId;
+    btn.classList.add('job-toggle');
 
     btn.onclick = () => {
       const groupLayer = jobLayers[utility][jobId];
@@ -1107,7 +1227,29 @@ function renderUtility(utility) {
       }
     };
 
-    items.appendChild(btn);
+    // 🔥 DELETE BUTTON
+    const deleteBtn = document.createElement('button');
+    deleteBtn.classList.add('job-delete');
+    deleteBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"/>
+      </svg>
+    `;
+    deleteBtn.className = 'job-delete';
+
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation(); // prevent toggle click
+
+      const confirmed = confirm(`Delete Job "${jobId}" and all its features?`);
+      if (!confirmed) return;
+
+      deleteEntireJob(utility, jobId);
+    };
+
+    row.appendChild(btn);
+    row.appendChild(deleteBtn);
+    items.appendChild(row);
+    
   });
 
   group.appendChild(items);
@@ -1120,6 +1262,42 @@ function renderUtility(utility) {
   };
 
   container.appendChild(group);
+}
+
+function deleteEntireJob(utility, jobId) {
+
+  const jobGroup = jobLayers[utility]?.[jobId];
+  if (!jobGroup) return;
+
+  jobGroup.eachLayer(layer => {
+
+    // Remove from drawnItems
+    if (drawnItems.hasLayer(layer)) {
+      drawnItems.removeLayer(layer);
+    }
+
+    // Remove from sublayers
+    if (layerConfig[utility]?.sublayers) {
+      Object.values(layerConfig[utility].sublayers).forEach(sub => {
+        if (sub.hasLayer(layer)) sub.removeLayer(layer);
+      });
+    }
+
+    // Remove from map
+    if (map.hasLayer(layer)) {
+      map.removeLayer(layer);
+    }
+
+  });
+
+  // Remove job group from main utility group
+  layerConfig[utility].group.removeLayer(jobGroup);
+
+  // Remove from storage
+  delete jobLayers[utility][jobId];
+
+  // Refresh UI
+  updateJobList(utility);
 }
 
 // =====================
@@ -1220,8 +1398,9 @@ function attachPopupHandlers(layer) {
         if (!jobLayers[utility][newJobId]) {
           jobLayers[utility][newJobId] = new L.FeatureGroup();
           layerConfig[utility].group.addLayer(jobLayers[utility][newJobId]);
-          addSingleJobButton(utility, newJobId);
         }
+
+        updateJobList(utility);
 
         // Move layer to new group
         if (!jobLayers[utility][newJobId].hasLayer(layer)) {
@@ -1356,7 +1535,6 @@ document.getElementById('export-excel-btn').addEventListener('click', () => {
 
       // Skip if JobID already exported
       if (jobId && seenJobIds.has(jobId)) return;
-
       if (jobId) seenJobIds.add(jobId);
 
       allFeatures.push({
@@ -1374,6 +1552,7 @@ document.getElementById('export-excel-btn').addEventListener('click', () => {
   }
 
   Object.entries(layerConfig).forEach(([mainKey, config]) => {
+    if (mainKey === 'stormwater') return;   //skip stormwater
     collectFeatures(config.group, mainKey);
 
     if (config.sublayers) {
@@ -1397,7 +1576,6 @@ document.getElementById('export-excel-btn').addEventListener('click', () => {
 // =====================
 // 9. Load GeoJSON
 // =====================
-
 document.getElementById('load-btn').addEventListener('click', () => {
   document.getElementById('load-file').click();
 });
@@ -1428,24 +1606,36 @@ document.getElementById('load-file').addEventListener('change', e => {
       return;
     }
     
-  
     geojson.features.forEach(feature => {
-
       const utility = feature.properties?.utility;
-      const jobId = feature.properties?.jobId;
-      const sublayerName = feature.properties?.sublayer;
+      const jobId = feature.properties?.jobId || `imported-${Date.now()}`;
+      const sublayerName = feature.properties?.sublayer || '';
 
-      if (!utility || !layerConfig[utility]) return;
-      const config = layerConfig[utility];
+      if (!utility) return;
+
+      // ✅ Ensure utility exists in layerConfig
+      if (!layerConfig[utility]) {
+        layerConfig[utility] = { group: L.featureGroup(), sublayers: {} };
+      }
+
+      // ✅ Ensure jobLayers container exists
+      if (!jobLayers[utility]) {
+        jobLayers[utility] = {};
+      }
+
+      // ✅ Ensure jobId group exists
+      if (!jobLayers[utility][jobId]) {
+        jobLayers[utility][jobId] = new L.FeatureGroup();
+        layerConfig[utility].group.addLayer(jobLayers[utility][jobId]);
+      }
 
       // Create GeoJSON normally
       const geoLayer = L.geoJSON(feature);
 
       geoLayer.eachLayer(layer => {
-
         layer._utility = utility;
-        layer._currentJobId = jobId || null;
-        layer._sublayer = sublayerName || null;
+        layer._currentJobId = jobId;
+        layer._sublayer = sublayerName;
 
         // 1️⃣ Add to drawnItems (enables edit/delete)
         drawnItems.addLayer(layer);
@@ -1473,7 +1663,6 @@ document.getElementById('load-file').addEventListener('change', e => {
       });
 
     });
-
 
     updateJobList();
   };
@@ -1513,10 +1702,11 @@ function loadCadastre() {
     .then(r => r.json())
     .then(parcelGeojson => {
   
-
+      cadastreLayers = [];
       // ---------- PARCELS ----------
       const parcels = L.geoJSON(parcelGeojson, {
         pane: 'cadastrePane',
+        interactive: true,
         style: {
           color: 'oklch(70% 0.03 220)',
           weight: 0.8,
@@ -1596,8 +1786,10 @@ function loadCadastre() {
       map.addLayer(cadastreLayer);
 
       cadastreLoaded = true;
-
-
+      
+      parcels.eachLayer(layer => {
+        cadastreLayers.push(layer);
+      });
       // ---------- LABEL VISIBILITY ----------
       map.on('zoomend', () => {
         const zoom = map.getZoom();

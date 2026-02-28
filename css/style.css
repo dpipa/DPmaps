@@ -161,16 +161,14 @@ html, body {
   padding: 10px 0;  /* Padding for spacing */
 }
 
-#job-buttons button {
-  width: 100%;  /* Ensure buttons fill the container */
+.job-row .job-toggle {
+  flex: 1;
   padding: 6px;
   background: var(--surface);
   color: var(--text-primary);
   border: none;
-  margin-bottom: 6px;
   cursor: pointer;
   text-align: left;
-  display: block;
 }
 
 #job-buttons button.active {
@@ -233,10 +231,12 @@ html, body {
   padding: 2px 4px;
   font-size: 11px;
   line-height: 1;
-  color: var(--accent);
+  color: var(--text-muted);
   font-weight: 600;
   max-width: 60px;
   min-width: 0;
+  pointer-events: none;
+  text-shadow: 0 0 2px var(--bg), 0 0 2px var(--bg);
 }
 
 #controls button.active {
@@ -303,9 +303,11 @@ html, body {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 2000;
+  padding: 20px 12px;
+  overflow-y: auto;
 }
 
 .about-modal.hidden {
@@ -318,6 +320,8 @@ html, body {
   color: var(--text-primary);
   width: 90%;
   max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
   padding: 18px 22px;
   border-radius: 12px; 
   box-shadow: var(--shadow-deep);
@@ -428,6 +432,9 @@ html, body {
   fill: oklch(52% 0.14 152);
 }
 
+.leaflet-pane.boundaryPane {
+  z-index: 1300 !important;
+}
 
 /* Stormwater popup table */
 .popup-table {
@@ -454,4 +461,31 @@ html, body {
 .leaflet-popup-content {
   max-height: 350px;
   overflow-y: auto;
+}
+
+/* delete icon in layer pane */
+.job-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.job-row button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;      /* same padding for toggle */
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.job-toggle {
+  flex: 1;
+  text-align: left;
+}
+
+.job-delete {
+  flex: 0 0 32px;         /* fixed width, matches toggle height */
+  height: auto;           /* let flex stretch */
+  padding: 0;             /* remove extra padding */
 }
