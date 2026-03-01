@@ -129,10 +129,8 @@ nswHybrid.addTo(map);
 map.on('baselayerchange', function(e) {
   if (e.name === "🌑 Dark Mode") {
     document.body.classList.add("dark-mode");
-    updateVectorLayersDark(true);
   } else {
     document.body.classList.remove("dark-mode");
-    updateVectorLayersDark(false);
   }
 });
 
