@@ -1,9 +1,9 @@
 :root {
   /* Dark foundation */
-  --bg: oklch(17% 0.005 250);
-  --surface: oklch(21% 0.008 250);
-  --surface-elevated: oklch(27% 0.012 250);
-  --border: oklch(38% 0.015 250);
+  --bg: oklch(20% 0.005 250);
+  --surface: oklch(22% 0.008 250);
+  --surface-elevated: oklch(30% 0.012 250);
+  --border: oklch(32% 0.01 250);
 
   /* Text */
   --text-primary: oklch(92% 0 0);
@@ -11,13 +11,119 @@
   --text-muted: oklch(55% 0 0);
 
   /* Accent (clean professional blue) */
-  --accent: oklch(65% 0.18 255);
-  --accent-hover: oklch(72% 0.18 255);
-  --accent-soft: oklch(65% 0.18 255 / 0.15);
+  --accent: oklch(65% 0.18 250);
+  --accent-hover: oklch(72% 0.18 250);
+  --accent-soft: oklch(65% 0.18 250 / 0.15);
 
   /* Shadows */
   --shadow-soft: 0 4px 12px rgba(0,0,0,0.35);
   --shadow-deep: 0 10px 30px rgba(0,0,0,0.45);
+}
+
+/* ================= DARK MODE ================= */
+body.dark-mode {
+  --bg: oklch(16% 0.005 250);
+  --surface: oklch(22% 0.008 250);
+  --surface-elevated: oklch(30% 0.012 250);
+  --border: oklch(32% 0.01 250);
+  --text-primary: oklch(94% 0 0);
+  --text-secondary: oklch(70% 0 0);
+  --accent: oklch(65% 0.18 250);
+}
+
+/* Page */
+body.dark-mode {
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+/* ================= LAYER CONTROL ================= */
+body.dark-mode .leaflet-control-layers {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+body.dark-mode .leaflet-control-layers label {
+  color: var(--text-primary);
+}
+
+/* ================= ZOOM CONTROLS ================= */
+body.dark-mode .leaflet-control-zoom a {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+body.dark-mode .leaflet-control-zoom a:hover {
+  border-color: var(--accent);
+}
+
+/* ================= DRAW TOOLBAR ================= */
+body.dark-mode .leaflet-draw-toolbar a {
+  filter: invert(1); /* makes sprite icons white */
+}
+
+body.dark-mode .leaflet-draw-toolbar a:hover {
+  border-color: var(--accent);
+}
+
+/* Draw tooltip */
+body.dark-mode .leaflet-draw-tooltip {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+/* ================= SEARCH CONTROL ================= */
+body.dark-mode .leaflet-control-geocoder {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+body.dark-mode .leaflet-control-geocoder input {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+/* Search icon sprite */
+body.dark-mode .leaflet-control-geocoder-icon {
+  filter: invert(1);
+}
+
+body.dark-mode .leaflet-control-geocoder-icon:hover {
+  border-color: var(--accent);
+}
+
+/* Search results dropdown */
+body.dark-mode .leaflet-control-geocoder-results {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+}
+
+body.dark-mode .leaflet-control-geocoder-result {
+  color: var(--text-primary);
+}
+
+body.dark-mode .leaflet-control-geocoder-result:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ================= HAMBURGER BUTTON ================= */
+body.dark-mode #toggle-pane-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+body.dark-mode #toggle-pane-btn .line {
+  background: var(--text-primary);
+}
+
+body.dark-mode #toggle-pane-btn:hover {
+  background: var(--surface-elevated);
+  border-color: var(--accent);
 }
 
 /* General layout for the page */

@@ -50,6 +50,19 @@ const osm = L.tileLayer(
   }
 );
 
+// OSM Dark Mode
+var Stadia_AlidadeSmoothDark = L.tileLayer(
+  'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.{ext}', 
+  {
+    minZoom: 0,
+    maxZoom: 20,
+    attribution: '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; ' +
+                 '<a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; ' +
+                 '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    ext: 'png'
+  }
+);
+
 // Esri global satellite
 const esriSatellite = L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/' +
@@ -98,7 +111,8 @@ const nswHybrid = L.layerGroup([
 ]);
 
 const baseMaps = {
-  "🗺️ Street Map (OSM)": osm,
+  "🗺️ Street Map": osm,
+  "🌑 Dark Mode": Stadia_AlidadeSmoothDark,
   "🛰️ NSW Imagery": nswImagery,
   "🛰️ NSW Hybrid (Imagery + Labels)": nswHybrid,
   "🛰️ Satellite (Esri)": esriSatellite
@@ -112,50 +126,67 @@ L.control.layers(baseMaps, null, {
 
 nswHybrid.addTo(map);
 
-// Search Bar
-const geocoder = L.Control.geocoder({
-  position: 'topleft',
-  placeholder: 'Search address or Job ID…',
-  geocoder: L.Control.Geocoder.nominatim({
-    geocodingQueryParams: {
-      countrycodes: 'au',
-      viewbox: '150.85,-33.95,151.05,-33.80', //Bounds to LGA
-      bounded: 1
-    }
-  }),
-  suggestMinLength: 3,
-  suggestTimeout: 250,
-  defaultMarkGeocode: false
-}).addTo(map);
+//dark mode
+map.on('baselayerchange', function(e) {
+  if (e.name === "🌑 Dark Mode") {
+    document.body.classList.add("dark-mode");
+    updateVectorLayersDark(true);
+  } else {
+    document.body.classList.remove("dark-mode");
+    updateVectorLayersDark(false);
+  }
+});
 
+// Search Bar
 // Keep a reference to the search marker
 let searchMarker = null;
 
-// 🔎 When user starts searching
-geocoder.on('startgeocode', function(e) {
+// Address search via Cloudflare Worker
+async function searchAddress(query) {
+  query = query.trim();
+  if (!query) return;
 
-  const query = e.input.trim().toLowerCase();
-  let foundLayers = [];
+  let results = [];
 
-  // Search Job IDs
+  try {
+    const res = await fetch(`https://broken-mode-a4aa.d-pipatvong.workers.dev/?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    results = (data.features || []).map(f => ({
+      name: f.place_name,
+      center: [f.center[1], f.center[0]] // [lat, lng]
+    }));
+  } catch (err) {
+    console.error("Address search failed", err);
+  }
+
+  // Show marker if found
+  if (results.length) {
+    const { name, center } = results[0];
+
+    if (searchMarker) map.removeLayer(searchMarker);
+    searchMarker = L.marker(center).addTo(map).bindPopup(name).openPopup();
+    map.setView(center, 18);
+  }
+
+  return results.length > 0;
+}
+
+    // Search Job IDs
+function searchJobIDs(query) {
+  const lowerQuery = query.trim().toLowerCase();
+  let foundLayers = [];   
+
   Object.keys(jobLayers).forEach(utility => {
-
     Object.keys(jobLayers[utility]).forEach(jobId => {
-
       if (jobId.toLowerCase().includes(query)) {
-
         const group = jobLayers[utility][jobId];
 
-        if (!map.hasLayer(group)) {
-          map.addLayer(group);
-        }
+        if (!map.hasLayer(group)) map.addLayer(group);
 
         group.eachLayer(layer => {
-          foundLayers.push(layer);
-
+          foundLayers.push(layer)
           if (layer.setStyle) {
             layer.setStyle({ weight: 6 });
-
             setTimeout(() => {
               applyUtilityStyle(
                 layer,
@@ -165,11 +196,8 @@ geocoder.on('startgeocode', function(e) {
             }, 1500);
           }
         });
-
       }
-
     });
-
   });
 
   // If Job found → zoom to it
@@ -177,28 +205,32 @@ geocoder.on('startgeocode', function(e) {
     const group = L.featureGroup(foundLayers);
     map.fitBounds(group.getBounds(), { padding: [50, 50] });
   }
-});
+  
+  return foundLayers.length > 0;
+}
 
-geocoder.on('markgeocode', function(e) {
-  const center = e.geocode.center;
+//======
+const geocoder = L.Control.geocoder({
+  position: 'topleft',
+  placeholder: 'Search address or Job ID…',
+  suggestMinLength: 3,
+  suggestTimeout: 250,
+  defaultMarkGeocode: false,
+  autocomplete: true //reduce request
+}).addTo(map);
 
-  if (searchMarker) {
-    map.removeLayer(searchMarker);
+geocoder.on('startgeocode', async function(e) {
+  const query = e.input.trim();
+  if (!query) return;
+
+  // 1️⃣ Try address search via Worker
+  const foundAddress = await searchAddress(query);
+
+  // 2️⃣ If no address found, try Job IDs
+  if (!foundAddress) {
+    const foundJobs = searchJobIDs(query);
+    if (!foundJobs) console.log("No address or Job ID found");
   }
-
-  searchMarker = L.marker(center, { riseOnHover: true }).addTo(map);
-
-  // Build full address
-  const props = e.geocode.properties || {};
-  const address = [
-    props.house_number || '',
-    props.road || '',
-    props.suburb || props.city || '',
-    props.state || '',
-    props.postcode || ''
-  ].filter(Boolean).join(', ');
-
-  map.setView(center, 18);
 });
 
 // =====================
@@ -433,11 +465,6 @@ function getLabelInterval() {
   if (zoom >= 15) return 5;   // medium → 5m
   return 10;                  // far → 10m
 }
-
-map.on("zoomend moveend", function () {
-  demContoursLayer.redraw();   // redraw lines
-  drawContourLabelsCanvas();   // redraw labels
-});
 
 //==========
 //map on click for cadastre, stormwater, contour
