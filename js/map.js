@@ -51,17 +51,16 @@ const osm = L.tileLayer(
 );
 
 // OSM Dark Mode
-var Stadia_AlidadeSmoothDark = L.tileLayer(
-  'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.{ext}', 
+document.body.classList.add("dark-mode");
+
+var Carto_Dark = L.tileLayer(
+  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   {
-    minZoom: 0,
-    maxZoom: 20,
-    attribution: '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; ' +
-                 '<a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; ' +
-                 '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    ext: 'png'
+    subdomains: 'abcd',
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a> &copy; <a href="https://carto.com/" target="_blank">CARTO</a>'
   }
-);
+).addTo(map);
 
 // Esri global satellite
 const esriSatellite = L.tileLayer(
@@ -112,7 +111,7 @@ const nswHybrid = L.layerGroup([
 
 const baseMaps = {
   "🗺️ Street Map": osm,
-  "🌑 Dark Mode": Stadia_AlidadeSmoothDark,
+  "🌑 Dark Mode": Carto_Dark,
   "🛰️ NSW Imagery": nswImagery,
   "🛰️ NSW Hybrid (Imagery + Labels)": nswHybrid,
   "🛰️ Satellite (Esri)": esriSatellite
@@ -216,7 +215,7 @@ const geocoder = L.Control.geocoder({
   suggestMinLength: 3,
   suggestTimeout: 250,
   defaultMarkGeocode: false,
-  autocomplete: true //reduce request
+  autocomplete: false //reduce request
 }).addTo(map);
 
 geocoder.on('startgeocode', async function(e) {
@@ -342,13 +341,13 @@ function loadContours(url, targetLayer, callback) {
           // Default 1m
           let color = 'oklch(70% 0.15 240)';
           let weight = 1.5;
-          let opacity = 0.8;
+          let opacity = 0.75;
 
           // Every 2m stronger
           if (level % 2 === 0) {
             color = 'oklch(60% 0.18 240)';
             weight = 2;
-            opacity = 0.9;
+            opacity = 0.85;
           }
 
           // Every 10m = index contour

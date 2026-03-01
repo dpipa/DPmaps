@@ -31,6 +31,14 @@ body.dark-mode {
   --accent: oklch(65% 0.18 250);
 }
 
+body.dark-mode .leaflet-tile {
+  filter:
+    brightness(1.15)
+    contrast(0.85)
+    saturate(1.25)
+    hue-rotate(-12deg);
+}
+
 /* Page */
 body.dark-mode {
   background: var(--bg);
@@ -400,7 +408,6 @@ html, body {
               0 0 10px var(--accent-soft);
 }
 
-
 /* Overlay */
 .about-modal {
   position: fixed;
@@ -597,7 +604,17 @@ html, body {
 }
 
 .job-delete {
-  flex: 0 0 32px;         /* fixed width, matches toggle height */
-  height: auto;           /* let flex stretch */
-  padding: 0;             /* remove extra padding */
+  flex: 0 0 32px;
+  height: auto;
+  padding: 0;
+  border: 1px solid transparent;  /* keeps size stable */
+  border-radius: 4px;
+  border-style: solid;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.job-delete:hover {
+  border-color: var(--accent);    
+  background-color: var(--surface-elevated); 
+  cursor: pointer;
 }
