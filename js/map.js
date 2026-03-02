@@ -38,11 +38,19 @@ function escapeHTML(str) {
 
 function rebuildCadastreLayerIndex() {
   cadastreLayers = [];
-  cadastreLayer.eachLayer(layer => {
+  
+    function collectPolygonLayers(layer) {
     if (layer.feature?.geometry?.type === 'Polygon' || layer.feature?.geometry?.type === 'MultiPolygon') {
       cadastreLayers.push(layer);
+      return;
     }
-  });
+
+    if (typeof layer.eachLayer === 'function') {
+      layer.eachLayer(collectPolygonLayers);
+    }
+  }
+
+  cadastreLayer.eachLayer(collectPolygonLayers);
 }
 
 // =====================
@@ -60,8 +68,6 @@ const osm = L.tileLayer(
 );
 
 // OSM Dark Mode
-document.body.classList.add("dark-mode");
-
 var Carto_Dark = L.tileLayer(
   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   {
@@ -69,7 +75,7 @@ var Carto_Dark = L.tileLayer(
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a> &copy; <a href="https://carto.com/" target="_blank">CARTO</a>'
   }
-).addTo(map);
+);
 
 // Esri global satellite
 const esriSatellite = L.tileLayer(
@@ -135,13 +141,17 @@ L.control.layers(baseMaps, null, {
 nswHybrid.addTo(map);
 
 //dark mode
-map.on('baselayerchange', function(e) {
-  if (e.name === "🌑 Dark Mode") {
-    document.body.classList.add("dark-mode");
-  } else {
-    document.body.classList.remove("dark-mode");
-  }
+function syncDarkModeClass(layerName) {
+  document.body.classList.toggle("dark-mode", layerName === "🌑 Dark Mode");
+}
+
+// Keep UI theme in sync with selected basemap
+map.on('baselayerchange', function (e) {
+  syncDarkModeClass(e.name);
 });
+
+// Ensure initial theme matches the default basemap
+syncDarkModeClass("🛰️ NSW Hybrid (Imagery + Labels)");
 
 // Search Bar
 // Keep a reference to the search marker

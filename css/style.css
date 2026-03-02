@@ -241,7 +241,7 @@ html, body {
   margin: 10px 0;
   padding: 10px;
   background: var(--surface);
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-primary);
   font-size: 14px;
   border-radius: 5px;
@@ -252,6 +252,7 @@ html, body {
 
 #layers-pane button:hover {
   background: var(--surface-elevated);
+  border-color: var(--accent-hover);
 }
 
 /* Job List */
@@ -634,8 +635,3 @@ body.dark-mode .popup-table .key {
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.job-delete:hover {
-  border-color: var(--accent);    
-  background-color: var(--surface-elevated); 
-  cursor: pointer;
-}
