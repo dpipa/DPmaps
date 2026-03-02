@@ -282,6 +282,7 @@ const stormwaterLayer = new L.FeatureGroup();
 const cadastreLayer = new L.FeatureGroup();
 const cadastreLabelLayer = new L.FeatureGroup();
 let cadastreLoaded = false;
+let cadastreLoadingPromise = null;
 let easementsLoaded = false;
 
 // =====================
@@ -501,11 +502,13 @@ map.on('click', function (e) {
     }
   }
 
-  // 3️⃣ Cadastre
-  for (let layer of cadastreLayers) {
-    if (layer.getBounds && layer.getBounds().contains(latlng)) {
-      if (layer.getPopup()) layer.openPopup();
-      return;
+  // 3️⃣ Cadastre (only when layer is visible)
+  if (map.hasLayer(cadastreLayer)) {
+    for (let layer of cadastreLayers) {
+      if (layer.getBounds && layer.getBounds().contains(latlng)) {
+        if (layer.getPopup()) layer.openPopup();
+        return;
+      }
     }
   }
   
@@ -1768,14 +1771,19 @@ function applyUtilityStyle(layer, utility, sublayerName) {
 // 10. Load SIX Maps–style cadastre
 // =====================
 function loadCadastre() {
-  if (cadastreLoaded) return;
+  if (cadastreLoaded) {
+    rebuildCadastreLayerIndex();
+    return Promise.resolve();
+  }
+
+  if (cadastreLoadingPromise) return cadastreLoadingPromise;
 
   const canvasRenderer = L.canvas({ padding: 0.5 });
-      
-  fetch('https://soft-credit-c195.d-pipatvong.workers.dev/Cadastre.geojson')
+
+  cadastreLoadingPromise = fetch('https://soft-credit-c195.d-pipatvong.workers.dev/Cadastre.geojson')
     .then(r => r.json())
     .then(parcelGeojson => {
-  
+
       cadastreLayers = [];
       // ---------- PARCELS ----------
       const parcels = L.geoJSON(parcelGeojson, {
@@ -1786,7 +1794,7 @@ function loadCadastre() {
           weight: 0.8,
           fill: false
         },
-        
+
         renderer: canvasRenderer,
         onEachFeature: (feature, layer) => {
 
@@ -1867,10 +1875,7 @@ function loadCadastre() {
           .catch(err => console.error('Failed to load easements:', err));
       }
 
-      map.addLayer(cadastreLayer);
-
       cadastreLoaded = true;
-      
       rebuildCadastreLayerIndex();
       // ---------- LABEL VISIBILITY ----------
       map.on('zoomend', () => {
@@ -1885,7 +1890,15 @@ function loadCadastre() {
 
       console.log('Cadastre (parcels + easements) loaded');
     })
-    .catch(console.error);
+    .catch(err => {
+      cadastreLoaded = false;
+      console.error(err);
+    })
+    .finally(() => {
+      cadastreLoadingPromise = null;
+    });
+
+  return cadastreLoadingPromise;
 }
 
 
@@ -1955,6 +1968,3 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('leaflet-version').textContent = L.version;
 
 });
-
-
-

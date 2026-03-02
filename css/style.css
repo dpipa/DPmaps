@@ -582,6 +582,27 @@ html, body {
   overflow-y: auto;
 }
 
+/* Dark mode popup styling */
+body.dark-mode .leaflet-popup-content-wrapper,
+body.dark-mode .leaflet-popup-tip {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+body.dark-mode .leaflet-popup-content {
+  color: var(--text-primary);
+}
+
+body.dark-mode .leaflet-popup-content a {
+  color: var(--accent-hover);
+}
+
+body.dark-mode .popup-table .key {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+}
+
 /* delete icon in layer pane */
 .job-row {
   display: flex;
