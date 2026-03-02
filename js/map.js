@@ -36,6 +36,15 @@ function escapeHTML(str) {
   });
 }
 
+function rebuildCadastreLayerIndex() {
+  cadastreLayers = [];
+  cadastreLayer.eachLayer(layer => {
+    if (layer.feature?.geometry?.type === 'Polygon' || layer.feature?.geometry?.type === 'MultiPolygon') {
+      cadastreLayers.push(layer);
+    }
+  });
+}
+
 // =====================
 // Map attribution
 // =====================
@@ -495,7 +504,7 @@ map.on('click', function (e) {
   // 3️⃣ Cadastre
   for (let layer of cadastreLayers) {
     if (layer.getBounds && layer.getBounds().contains(latlng)) {
-      layer.openPopup();
+      if (layer.getPopup()) layer.openPopup();
       return;
     }
   }
@@ -1805,6 +1814,15 @@ function loadCadastre() {
             className: 'cadastre-label'
           });
         }
+
+        layer.bindPopup(`
+          <strong>Cadastre</strong><br>
+          ${House_No ? `House No: ${escapeHTML(String(House_No))}<br>` : ''}
+          ${LOT_NO ? `Lot: ${escapeHTML(String(LOT_NO))}<br>` : ''}
+          ${DP_NO ? `DP: ${escapeHTML(String(DP_NO))}<br>` : ''}
+          <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${layer.getBounds().getCenter().lat},${layer.getBounds().getCenter().lng}" target="_blank" rel="noopener">Open Street View</a>
+        `);
+
       // ----- Right-click Street View -----
       layer.on('contextmenu', e => {
         const { lat, lng } = e.latlng;
@@ -1844,6 +1862,7 @@ function loadCadastre() {
 
             // SAME cadastre group
             cadastreLayer.addLayer(easements);
+            rebuildCadastreLayerIndex();
           })
           .catch(err => console.error('Failed to load easements:', err));
       }
@@ -1852,9 +1871,7 @@ function loadCadastre() {
 
       cadastreLoaded = true;
       
-      parcels.eachLayer(layer => {
-        cadastreLayers.push(layer);
-      });
+      rebuildCadastreLayerIndex();
       // ---------- LABEL VISIBILITY ----------
       map.on('zoomend', () => {
         const zoom = map.getZoom();
