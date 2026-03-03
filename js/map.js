@@ -959,6 +959,56 @@ const drawControl = new L.Control.Draw({
 
 map.addControl(drawControl);
 
+function snapshotLayerForUndo(layer) {
+  if (!layer) return null;
+
+  const feature = layer.toGeoJSON();
+  feature.properties = { ...(layer.feature?.properties || feature.properties || {}) };
+
+  return feature;
+}
+
+function restoreFeatureFromUndo(feature) {
+  const utility = feature.properties?.utility;
+  const jobId = feature.properties?.jobId;
+  const sublayerName = feature.properties?.sublayer || '';
+
+  if (!utility || !jobId || !layerConfig[utility]) return;
+
+  if (!jobLayers[utility]) jobLayers[utility] = {};
+
+  if (!jobLayers[utility][jobId]) {
+    jobLayers[utility][jobId] = new L.FeatureGroup();
+    layerConfig[utility].group.addLayer(jobLayers[utility][jobId]);
+  }
+
+  L.geoJSON(feature).eachLayer(layer => {
+    layer._utility = utility;
+    layer._currentJobId = jobId;
+    layer._sublayer = sublayerName;
+
+    drawnItems.addLayer(layer);
+    jobLayers[utility][jobId].addLayer(layer);
+    applyUtilityStyle(layer, utility, sublayerName);
+    attachPopupHandlers(layer);
+  });
+}
+
+function restoreDeletedBatch(batch) {
+  if (!Array.isArray(batch) || !batch.length) return;
+
+  const affectedUtilities = new Set();
+
+  batch.forEach(feature => {
+    const utility = feature?.properties?.utility;
+    restoreFeatureFromUndo(feature);
+    if (utility) affectedUtilities.add(utility);
+  });
+
+  affectedUtilities.forEach(u => updateJobList(u));
+}
+
+
 map.on('draw:deletestart', function () {
   const confirmed = confirm('Delete mode enabled. Click a shape to delete it.');
   if (!confirmed) {
@@ -981,6 +1031,7 @@ function toggleDrawLayer(show) {
 map.on('draw:deleted', function (e) {
 
   const affectedUtilities = new Set();
+  const deletedBatch = [];
 
   e.layers.eachLayer(layer => {
 
@@ -989,6 +1040,9 @@ map.on('draw:deleted', function (e) {
 
     if (!utility || !layerConfig[utility]) return;
     const config = layerConfig[utility];
+
+    const snapshot = snapshotLayerForUndo(layer);
+    if (snapshot) deletedBatch.push(snapshot);
 
     // 1️⃣ Remove from drawnItems
     if (drawnItems.hasLayer(layer)) drawnItems.removeLayer(layer);
@@ -1030,6 +1084,8 @@ map.on('draw:deleted', function (e) {
     // 7️⃣ Clean up reference
     layer._currentJobId = null;
   });
+
+  if (deletedBatch.length) deletedFeatureStack.push(deletedBatch);
 
   affectedUtilities.forEach(u => updateJobList(u));
 });
@@ -1181,8 +1237,17 @@ map.on(L.Draw.Event.EDITED, function (e) {
 //measure tool
 //===========
 let liveMeasureTooltip = null;
+let activeDrawHandler = null;
+const deletedFeatureStack = [];
 
 map.on('draw:drawstart', function () {
+
+  const drawToolbar = drawControl?._toolbars?.draw;
+  if (drawToolbar?._modes) {
+    activeDrawHandler = Object.values(drawToolbar._modes)
+      .map(mode => mode.handler)
+      .find(handler => handler?.enabled?.()) || null;
+  }
 
   liveMeasureTooltip = L.tooltip({
     permanent: false,
@@ -1225,14 +1290,37 @@ map.on('draw:drawvertex', function (e) {
   }
 });
 
-
 map.on('draw:drawstop', function () {
+  activeDrawHandler = null;
+
   if (liveMeasureTooltip) {
     map.removeLayer(liveMeasureTooltip);
     liveMeasureTooltip = null;
   }
 });
 
+// Keyboard shortcut: Ctrl/Cmd + Z
+// - while drawing: undo last vertex
+// - after deleting features: restore last deleted feature(s)
+document.addEventListener('keydown', function (e) {
+  const inTextField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)
+    || e.target?.isContentEditable;
+
+  if (inTextField) return;
+  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
+
+  if (activeDrawHandler && typeof activeDrawHandler.deleteLastVertex === 'function') {
+    activeDrawHandler.deleteLastVertex();
+    e.preventDefault();
+    return;
+  }
+
+  const lastDeletedBatch = deletedFeatureStack.pop();
+  if (lastDeletedBatch?.length) {
+    restoreDeletedBatch(lastDeletedBatch);
+    e.preventDefault();
+  }
+});
 
 //=========
 // Job list update (optimized)
