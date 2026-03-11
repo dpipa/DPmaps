@@ -103,6 +103,23 @@ const nswImagery = L.tileLayer(
   }
 );
 
+// Nearmap Simple WMS
+const NEARMAP_WMS_ENDPOINT = 'https://summer-cloud-a5f2.d-pipatvong.workers.dev/nearmap/wms';
+const NEARMAP_WMS_LAYER = 'Nearmap/Nearmap/Australia'; //this is correct, not Vert
+
+const nearmapBaseParams = {
+  pane: 'basePane',
+  format: 'image/jpeg',
+  transparent: false,
+  version: '1.1.1',
+  layers: NEARMAP_WMS_LAYER,
+  attribution:
+    '© <a href="https://www.nearmap.com" target="_blank" rel="noopener">Nearmap</a>',
+  maxZoom: 22,
+};
+
+const nearmap = L.tileLayer.wms(NEARMAP_WMS_ENDPOINT, nearmapBaseParams);
+
 //====================
 // Tile Layers
 //====================
@@ -129,9 +146,9 @@ const baseMaps = {
   "🌑 Dark Mode": Carto_Dark,
   "🛰️ NSW Imagery": nswImagery,
   "🛰️ NSW Hybrid (Imagery + Labels)": nswHybrid,
-  "🛰️ Satellite (Esri)": esriSatellite
+  "🛰️ Satellite (Esri)": esriSatellite,
+  "🛰️ Nearmap": nearmap
 };
-
 
 L.control.layers(baseMaps, null, {
   position: 'topright',
