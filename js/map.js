@@ -89,8 +89,8 @@ const esriSatellite = L.tileLayer(
   }
 );
 
-// NSW SixMaps imagery
-const nswImagery = L.tileLayer(
+// NSW SixMaps imagery (current)
+const nswImageryCurrent = L.tileLayer(
   'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
   {
     pane: 'basePane',
@@ -102,6 +102,103 @@ const nswImagery = L.tileLayer(
     maxZoom: 21
   }
 );
+
+// NSW SixMaps historical imagery (free/public) merged into NSW Imagery layer
+const SIXMAPS_IMAGERY_VINTAGES = [
+  'Latest',
+  2024, 2020, 2013, 2005, 2004, 1991, 1986, 1984, 1983,
+  1978, 1975, 1973, 1972, 1965, 1943
+];
+const SIXMAPS_IMAGERY_DEFAULT_VINTAGE = 'Latest';
+const SIXMAPS_IMAGERY_DEFAULT_HISTORICAL_YEAR = 1943;
+const SIXMAPS_IMAGERY_NUMERIC_YEARS = SIXMAPS_IMAGERY_VINTAGES.filter(v => typeof v === 'number');
+const SIXMAPS_IMAGERY_MIN_INPUT_YEAR = Math.min(...SIXMAPS_IMAGERY_NUMERIC_YEARS);
+
+function toSixmapsWmsTimeRange(year) {
+  const start = new Date(Date.UTC(year, 0, 1));
+  const end = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
+  return { start, end };
+}
+
+const sixmapsHistorical = L.esri.dynamicMapLayer({
+  url: 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/ImageServer',
+  pane: 'basePane',
+  layers: [0],
+  opacity: 1,
+  useCors: true,
+  disableCache: true,
+  attribution:
+    '© State of New South Wales (Spatial Services, a business unit of the Department of Customer Service NSW). ' +
+    'Historical imagery served by SixMaps.'
+});
+
+const defaultHistoricalRange = toSixmapsWmsTimeRange(SIXMAPS_IMAGERY_DEFAULT_HISTORICAL_YEAR);
+sixmapsHistorical.setTimeRange(defaultHistoricalRange.start, defaultHistoricalRange.end);
+
+const nswImagery = L.layerGroup([sixmapsHistorical]);
+
+function setNswImageryVintage(vintage) {
+  nswImagery.clearLayers();
+
+  if (vintage === 'Latest') {
+    nswImagery.addLayer(nswImageryCurrent);
+    return;
+  }
+
+  sixmapsHistorical.setDynamicLayers([
+    {
+      id: 0,
+      source: {
+        type: "mapLayer",
+        mapLayerId: 0
+      },
+      definitionExpression: `ImageYear = ${vintage}`
+    }
+  ]);
+
+  nswImagery.addLayer(sixmapsHistorical);
+}
+
+setNswImageryVintage(SIXMAPS_IMAGERY_DEFAULT_VINTAGE);
+
+let historicalYearSlider = null;
+let historicalYearInput = null;
+let historicalYearValue = null;
+
+function updateHistoricalControlOptions() {
+  if (!historicalYearSlider || !historicalYearValue) return;
+
+  historicalYearSlider.max = String(SIXMAPS_IMAGERY_VINTAGES.length - 1);
+
+  const hasDefault = SIXMAPS_IMAGERY_VINTAGES.includes(SIXMAPS_IMAGERY_DEFAULT_VINTAGE);
+  const selectedVintage = hasDefault ? SIXMAPS_IMAGERY_DEFAULT_VINTAGE : SIXMAPS_IMAGERY_VINTAGES[0];
+  historicalYearSlider.value = String(SIXMAPS_IMAGERY_VINTAGES.indexOf(selectedVintage));
+  historicalYearValue.textContent = String(selectedVintage);
+  
+  if (historicalYearInput) {
+    historicalYearInput.value = selectedVintage === 'Latest' ? '' : String(selectedVintage);
+  }
+}
+
+function applyManualHistoricalYear(rawYear) {
+  const year = Number(rawYear);
+  if (!Number.isFinite(year)) return;
+
+  const historicalYears = SIXMAPS_IMAGERY_VINTAGES.filter(v => typeof v === 'number');
+  if (!historicalYears.length) return;
+
+  const nearestYear = historicalYears.reduce((closest, current) => {
+    return Math.abs(current - year) < Math.abs(closest - year) ? current : closest;
+  }, historicalYears[0]);
+
+  const yearIndex = SIXMAPS_IMAGERY_VINTAGES.indexOf(nearestYear);
+  if (historicalYearSlider && yearIndex >= 0) {
+    historicalYearSlider.value = String(yearIndex);
+  }
+  historicalYearValue.textContent = String(nearestYear);
+  if (historicalYearInput) historicalYearInput.value = String(nearestYear);
+  setNswImageryVintage(nearestYear);
+}
 
 // Nearmap Simple WMS
 const NEARMAP_WMS_ENDPOINT = 'https://summer-cloud-a5f2.d-pipatvong.workers.dev/nearmap/wms';
@@ -137,7 +234,7 @@ const esriRoadLabels = L.tileLayer(
 
 // Hybrid layer
 const nswHybrid = L.layerGroup([
-  nswImagery,
+  nearmap,
   esriRoadLabels
 ]);
 
@@ -145,9 +242,8 @@ const baseMaps = {
   "🗺️ Street Map": osm,
   "🌑 Dark Mode": Carto_Dark,
   "🛰️ NSW Imagery": nswImagery,
-  "🛰️ NSW Hybrid (Imagery + Labels)": nswHybrid,
-  "🛰️ Satellite (Esri)": esriSatellite,
-  "🛰️ Nearmap": nearmap
+  "🛰️ Nearmap Hybrid (Imagery + Labels)": nswHybrid,
+  "🛰️ Satellite (Esri)": esriSatellite
 };
 
 L.control.layers(baseMaps, null, {
@@ -162,14 +258,77 @@ function syncDarkModeClass(layerName) {
   document.body.classList.toggle("dark-mode", layerName === "🌑 Dark Mode");
 }
 
+const historicalControl = L.control({ position: 'bottomright' });
+
+historicalControl.onAdd = function () {
+  const container = L.DomUtil.create('div', 'leaflet-bar sixmaps-historical-control');
+  container.innerHTML = `
+    <div class="historical-control-card">
+      <strong>NSW Imagery Vintage</strong>
+      <div class="historical-year-row">
+        <label for="historical-year-slider">Year:</label>
+        <span id="historical-year-value">${SIXMAPS_IMAGERY_DEFAULT_VINTAGE}</span>
+      </div>
+      <input id="historical-year-slider" type="range" min="0" max="${SIXMAPS_IMAGERY_VINTAGES.length - 1}" step="1" value="${SIXMAPS_IMAGERY_VINTAGES.indexOf(SIXMAPS_IMAGERY_DEFAULT_VINTAGE)}" aria-label="SixMaps historical year slider" />
+      <div class="historical-manual-row">
+        <input id="historical-year-input" type="number" min="1943" placeholder="Type year" />
+        <button id="historical-year-apply" type="button">Go</button>
+      </div>
+      <small>Latest uses NSW Imagery; other years use free SixMaps historical imagery.</small>
+    </div>
+  `;
+
+  L.DomEvent.disableClickPropagation(container);
+  L.DomEvent.disableScrollPropagation(container);
+
+  historicalYearSlider = container.querySelector('#historical-year-slider');
+  historicalYearInput = container.querySelector('#historical-year-input');
+  const historicalYearApply = container.querySelector('#historical-year-apply');
+  historicalYearValue = container.querySelector('#historical-year-value');
+
+  historicalYearSlider.addEventListener('input', (event) => {
+    const selectedVintage = SIXMAPS_IMAGERY_VINTAGES[Number(event.target.value)];
+    historicalYearValue.textContent = selectedVintage;
+    if (historicalYearInput) {
+      historicalYearInput.value = selectedVintage === 'Latest' ? '' : String(selectedVintage);
+    }
+    setNswImageryVintage(selectedVintage);
+  });
+
+  historicalYearApply.addEventListener('click', () => {
+    applyManualHistoricalYear(historicalYearInput?.value);
+  });
+
+  historicalYearInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    applyManualHistoricalYear(historicalYearInput?.value);
+  });
+
+  updateHistoricalControlOptions();
+
+  return container;
+};
+
+historicalControl.addTo(map);
+
+function toggleHistoricalControl(layerName) {
+  const container = document.querySelector('.sixmaps-historical-control');
+  if (!container) return;
+  container.style.display = layerName === '🛰️ NSW Imagery' ? 'block' : 'none';
+}
+
 // Keep UI theme in sync with selected basemap
 map.on('baselayerchange', function (e) {
   syncDarkModeClass(e.name);
+  toggleHistoricalControl(e.name);
 });
 
 // Ensure initial theme matches the default basemap
-syncDarkModeClass("🛰️ NSW Hybrid (Imagery + Labels)");
+syncDarkModeClass("🛰️ Nearmap Hybrid (Imagery + Labels)");
+toggleHistoricalControl("🛰️ Nearmap Hybrid (Imagery + Labels)");
 
+//================
 // Search Bar
 // Keep a reference to the search marker
 let searchMarker = null;
@@ -650,8 +809,6 @@ buttons.forEach(button => {
     // 2️⃣ Show/hide submenus
     roadworksSubmenu.style.display = (utility === 'roadworks') ? 'block' : 'none';
     telecomSubmenu.style.display = (utility === 'telecommunications') ? 'block' : 'none';
-
-
 
     // 4️⃣ Re-add drawnItems so it stays on top
     if (!map.hasLayer(drawnItems)) map.addLayer(drawnItems);
