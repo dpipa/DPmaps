@@ -104,59 +104,53 @@ const nswImageryCurrent = L.tileLayer(
 );
 
 // NSW SixMaps historical imagery (free/public) merged into NSW Imagery layer
-const SIXMAPS_IMAGERY_VINTAGES = [
-  'Latest',
-  2024, 2020, 2013, 2005, 2004, 1991, 1986, 1984, 1983,
-  1978, 1975, 1973, 1972, 1965, 1943
-];
+const SIXMAPS_IMAGERY_VINTAGES = ['Latest', 1943, 1965, 1975, 1984, 1991, 2004, 2005, 2013];
 const SIXMAPS_IMAGERY_DEFAULT_VINTAGE = 'Latest';
-const SIXMAPS_IMAGERY_DEFAULT_HISTORICAL_YEAR = 1943;
-const SIXMAPS_IMAGERY_NUMERIC_YEARS = SIXMAPS_IMAGERY_VINTAGES.filter(v => typeof v === 'number');
-const SIXMAPS_IMAGERY_MIN_INPUT_YEAR = Math.min(...SIXMAPS_IMAGERY_NUMERIC_YEARS);
 
-function toSixmapsWmsTimeRange(year) {
-  const start = new Date(Date.UTC(year, 0, 1));
-  const end = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
-  return { start, end };
-}
+const SIXMAPS_HISTORICAL_LAYERS = {
+  1943: L.tileLayer(
+    'https://maps.six.nsw.gov.au/arcgis/rest/services/sixmaps/sydney1943/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'basePane', attribution: '© Department of Customer Service NSW. Historical imagery served by SixMaps.', maxZoom: 19 }
+  ),
+  1965: L.tileLayer(
+    'https://portal.spatial.nsw.gov.au/tileservices/Hosted/HistoricalImagery1965/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'basePane', attribution: '© NSW Spatial Services. Historical imagery served by SixMaps.', maxZoom: 19 }
+  ),
+  1975: L.tileLayer(
+    'https://portal.spatial.nsw.gov.au/tileservices/Hosted/HistoricalImagery1975/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'basePane', attribution: '© NSW Spatial Services. Historical imagery served by SixMaps.', maxZoom: 19 }
+  ),
+  1984: L.tileLayer(
+    'https://portal.spatial.nsw.gov.au/tileservices/Hosted/HistoricalImagery1984/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'basePane', attribution: '© NSW Spatial Services. Historical imagery served by SixMaps.', maxZoom: 19 }
+  ),
+  1991: L.tileLayer(
+    'https://portal.spatial.nsw.gov.au/tileservices/Hosted/HistoricalImagery1991/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'basePane', attribution: '© NSW Spatial Services. Historical imagery served by SixMaps.', maxZoom: 19 }
+  ),
+  2004: L.tileLayer(
+    'https://portal.spatial.nsw.gov.au/tileservices/Hosted/HistoricalImagery2004/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'basePane', attribution: '© NSW Spatial Services. Historical imagery served by SixMaps.', maxZoom: 19 }
+  ),
+  2005: L.tileLayer(
+    'https://portal.spatial.nsw.gov.au/tileservices/Hosted/HistoricalImagery2005/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'basePane', attribution: '© NSW Spatial Services. Historical imagery served by SixMaps.', maxZoom: 19 }
+  ),
+  2013: L.tileLayer(
+    'https://portal.spatial.nsw.gov.au/tileservices/Hosted/HistoricalImagery2013/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'basePane', attribution: '© NSW Spatial Services. Historical imagery served by SixMaps.', maxZoom: 19 }
+  ),
+};
 
-const sixmapsHistorical = L.esri.dynamicMapLayer({
-  url: 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/ImageServer',
-  pane: 'basePane',
-  layers: [0],
-  opacity: 1,
-  useCors: true,
-  disableCache: true,
-  attribution:
-    '© State of New South Wales (Spatial Services, a business unit of the Department of Customer Service NSW). ' +
-    'Historical imagery served by SixMaps.'
-});
-
-const defaultHistoricalRange = toSixmapsWmsTimeRange(SIXMAPS_IMAGERY_DEFAULT_HISTORICAL_YEAR);
-sixmapsHistorical.setTimeRange(defaultHistoricalRange.start, defaultHistoricalRange.end);
-
-const nswImagery = L.layerGroup([sixmapsHistorical]);
+const nswImagery = L.layerGroup([]);
 
 function setNswImageryVintage(vintage) {
   nswImagery.clearLayers();
-
   if (vintage === 'Latest') {
     nswImagery.addLayer(nswImageryCurrent);
-    return;
+  } else {
+    nswImagery.addLayer(SIXMAPS_HISTORICAL_LAYERS[vintage]);
   }
-
-  sixmapsHistorical.setDynamicLayers([
-    {
-      id: 0,
-      source: {
-        type: "mapLayer",
-        mapLayerId: 0
-      },
-      definitionExpression: `ImageYear = ${vintage}`
-    }
-  ]);
-
-  nswImagery.addLayer(sixmapsHistorical);
 }
 
 setNswImageryVintage(SIXMAPS_IMAGERY_DEFAULT_VINTAGE);
@@ -271,10 +265,10 @@ historicalControl.onAdd = function () {
       </div>
       <input id="historical-year-slider" type="range" min="0" max="${SIXMAPS_IMAGERY_VINTAGES.length - 1}" step="1" value="${SIXMAPS_IMAGERY_VINTAGES.indexOf(SIXMAPS_IMAGERY_DEFAULT_VINTAGE)}" aria-label="SixMaps historical year slider" />
       <div class="historical-manual-row">
-        <input id="historical-year-input" type="number" min="1943" placeholder="Type year" />
+        <input id="historical-year-input" type="number" min="1943" max="1943" placeholder="e.g. 1943" />
         <button id="historical-year-apply" type="button">Go</button>
       </div>
-      <small>Latest uses NSW Imagery; other years use free SixMaps historical imagery.</small>
+      <small>Latest uses NSW Imagery. 1943 shows Sydney metro area only.</small>
     </div>
   `;
 
@@ -330,6 +324,7 @@ toggleHistoricalControl("🛰️ Nearmap Hybrid (Imagery + Labels)");
 
 //================
 // Search Bar
+//================
 // Keep a reference to the search marker
 let searchMarker = null;
 
